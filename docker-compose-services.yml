@@ -1,0 +1,44 @@
+services:
+  simulator-service:
+    build:
+      context: ./simulator-service
+    container_name: simulator-service
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      BOOTSTRAP_SERVERS: "kafka-1:9093,kafka-2:9093,kafka-3:9093"
+      TOPIC: "events"
+      PRODUCE_INTERVAL_SEC: "1"
+      KAFKA_SECURITY_PROTOCOL: "ssl"
+      KAFKA_SSL_CA_LOCATION: "/sec/ca.crt"
+      KAFKA_SSL_CERT_LOCATION: "/sec/client.crt"
+      KAFKA_SSL_KEY_LOCATION: "/sec/client.key"
+    volumes:
+      - ./security/ca/ca.crt:/sec/ca.crt:ro
+      - ./security/clients/producer/client.crt:/sec/client.crt:ro
+      - ./security/clients/producer/client.key:/sec/client.key:ro
+    restart: unless-stopped
+
+  analytics-service:
+    build:
+      context: ./analytics-service
+    container_name: analytics-service
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      BOOTSTRAP_SERVERS: "kafka-1:9093,kafka-2:9093,kafka-3:9093"
+      TOPIC: "events"
+      GROUP_ID: "analytics-group"
+      AUTO_OFFSET_RESET: "earliest"
+      KAFKA_SECURITY_PROTOCOL: "ssl"
+      KAFKA_SSL_CA_LOCATION: "/sec/ca.crt"
+      KAFKA_SSL_CERT_LOCATION: "/sec/client.crt"
+      KAFKA_SSL_KEY_LOCATION: "/sec/client.key"
+      STORE_RAW_EVENTS: "false"
+    volumes:
+      - ./security/ca/ca.crt:/sec/ca.crt:ro
+      - ./security/clients/analytics/client.crt:/sec/client.crt:ro
+      - ./security/clients/analytics/client.key:/sec/client.key:ro
+    restart: unless-stopped

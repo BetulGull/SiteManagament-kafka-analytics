@@ -1,0 +1,248 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka-1:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "19092:9093"
+    volumes:
+      - ./security/brokers/kafka-1:/etc/kafka/secrets:ro
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,SSL:SSL"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-1:9092,SSL://kafka-1:9093"
+
+      KAFKA_SSL_KEYSTORE_FILENAME: "keystore.p12"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "keystore_creds"
+      KAFKA_SSL_KEY_CREDENTIALS: "key_creds"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "truststore.p12"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "truststore_creds"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka-1:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-2:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-2
+    depends_on:
+      - zookeeper
+    ports:
+      - "9093:9092"
+      - "19093:9093"
+    volumes:
+      - ./security/brokers/kafka-2:/etc/kafka/secrets:ro
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,SSL:SSL"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-2:9092,SSL://kafka-2:9093"
+
+      KAFKA_SSL_KEYSTORE_FILENAME: "keystore.p12"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "keystore_creds"
+      KAFKA_SSL_KEY_CREDENTIALS: "key_creds"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "truststore.p12"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "truststore_creds"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka-2:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-3:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-3
+    depends_on:
+      - zookeeper
+    ports:
+      - "9094:9092"
+      - "19094:9093"
+    volumes:
+      - ./security/brokers/kafka-3:/etc/kafka/secrets:ro
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,SSL:SSL"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-3:9092,SSL://kafka-3:9093"
+
+      KAFKA_SSL_KEYSTORE_FILENAME: "keystore.p12"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "keystore_creds"
+      KAFKA_SSL_KEY_CREDENTIALS: "key_creds"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "truststore.p12"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "truststore_creds"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka-3:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  #  Deterministic kafka-init (no docker.sock, no hardcoded network, SSL wait + create + verify)
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-init
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+    volumes:
+      - ./security:/sec:ro
+      - ./scripts/kafka-init.sh:/work/kafka-init.sh:ro
+    entrypoint: ["/bin/bash", "/work/kafka-init.sh"]
+    restart: "no"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "8888:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+      KAFKA_CLUSTERS_0_ZOOKEEPER: "zookeeper:2181"
+
+  simulator-service:
+    build:
+      context: ./simulator-service
+    container_name: simulator-service
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      BOOTSTRAP_SERVERS: "kafka-1:9093,kafka-2:9093,kafka-3:9093"
+      TOPIC: "events"
+      PRODUCE_INTERVAL_SEC: "1"
+      KAFKA_SECURITY_PROTOCOL: "ssl"
+      KAFKA_SSL_CA_LOCATION: "/sec/ca.crt"
+      KAFKA_SSL_CERT_LOCATION: "/sec/client.crt"
+      KAFKA_SSL_KEY_LOCATION: "/sec/client.key"
+    volumes:
+      - ./security/ca/ca.crt:/sec/ca.crt:ro
+      - ./security/clients/producer/client.crt:/sec/client.crt:ro
+      - ./security/clients/producer/client.key:/sec/client.key:ro
+    restart: unless-stopped
+
+  analytics-service:
+    build:
+      context: ./analytics-service
+    container_name: analytics-service
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      BOOTSTRAP_SERVERS: "kafka-1:9093,kafka-2:9093,kafka-3:9093"
+      TOPIC: "events"
+      GROUP_ID: "analytics-group"
+      AUTO_OFFSET_RESET: "earliest"
+      KAFKA_SECURITY_PROTOCOL: "ssl"
+      KAFKA_SSL_CA_LOCATION: "/sec/ca.crt"
+      KAFKA_SSL_CERT_LOCATION: "/sec/client.crt"
+      KAFKA_SSL_KEY_LOCATION: "/sec/client.key"
+    volumes:
+      - ./security/ca/ca.crt:/sec/ca.crt:ro
+      - ./security/clients/analytics/client.crt:/sec/client.crt:ro
+      - ./security/clients/analytics/client.key:/sec/client.key:ro
+    restart: unless-stopped
+
+  # ---------------------------
+  # ATTACK SCENARIOS (opt-in)
+  # Run: docker compose --profile attack up --build
+  # ---------------------------
+  attacker-invalid-cert-producer:
+    profiles: ["attack"]
+    build:
+      context: ./simulator-service
+    container_name: attacker-invalid-cert-producer
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      BOOTSTRAP_SERVERS: "kafka-1:9093,kafka-2:9093,kafka-3:9093"
+      TOPIC: "events"
+      PRODUCE_INTERVAL_SEC: "1"
+      KAFKA_SECURITY_PROTOCOL: "ssl"
+      KAFKA_SSL_CA_LOCATION: "/sec/ca.crt"
+      KAFKA_SSL_CERT_LOCATION: "/sec/client.crt"
+      KAFKA_SSL_KEY_LOCATION: "/sec/client.key"
+    volumes:
+      - ./security/ca/ca.crt:/sec/ca.crt:ro
+      - ./security/clients/attacker-invalid-cert/client.crt:/sec/client.crt:ro
+      - ./security/clients/attacker-invalid-cert/client.key:/sec/client.key:ro
+    restart: "no"
+
+  attacker-invalid-cert-consumer:
+    profiles: ["attack"]
+    build:
+      context: ./analytics-service
+    container_name: attacker-invalid-cert-consumer
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      BOOTSTRAP_SERVERS: "kafka-1:9093,kafka-2:9093,kafka-3:9093"
+      TOPIC: "events"
+      GROUP_ID: "attacker-invalid-consumer"
+      AUTO_OFFSET_RESET: "earliest"
+      KAFKA_SECURITY_PROTOCOL: "ssl"
+      KAFKA_SSL_CA_LOCATION: "/sec/ca.crt"
+      KAFKA_SSL_CERT_LOCATION: "/sec/client.crt"
+      KAFKA_SSL_KEY_LOCATION: "/sec/client.key"
+      # Optional: make consumer exit quickly if your code supports it
+      # EXIT_AFTER_SEC: "10"
+    volumes:
+      - ./security/ca/ca.crt:/sec/ca.crt:ro
+      - ./security/clients/attacker-invalid-cert/client.crt:/sec/client.crt:ro
+      - ./security/clients/attacker-invalid-cert/client.key:/sec/client.key:ro
+    restart: "no"

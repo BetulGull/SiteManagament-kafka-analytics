@@ -1,0 +1,167 @@
+services:
+  kafka-1:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-1
+    hostname: kafka-1
+    ports:
+      - "9092:9092"
+      - "19092:9093"
+    volumes:
+      - ./security/brokers/kafka-1:/etc/kafka/secrets:ro
+      - kafka1-data:/var/lib/kafka/data
+    environment:
+      CLUSTER_ID: abcdefghijklmnopqrstuv
+
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:9095,2@kafka-2:9095,3@kafka-3:9095"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093,SASL_SSL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-1:9092,SSL://kafka-1:9093,SASL_SSL://kafka-1:9094"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_SSL:SASL_SSL,CONTROLLER:PLAINTEXT"
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SSL"
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+
+      KAFKA_SSL_KEYSTORE_FILENAME: "keystore.p12"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "keystore_creds"
+      KAFKA_SSL_KEY_CREDENTIALS: "key_creds"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "truststore.p12"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "truststore_creds"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      KAFKA_LISTENER_NAME_SASL_SSL_SSL_CLIENT_AUTH: "none"
+      KAFKA_SASL_ENABLED_MECHANISMS: "SCRAM-SHA-256"
+      KAFKA_LISTENER_NAME_SASL_SSL_SASL_ENABLED_MECHANISMS: "SCRAM-SHA-256"
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf"
+
+      KAFKA_AUTHORIZER_CLASS_NAME: "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS;User:kafka-1;User:kafka-2;User:kafka-3"
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=([^,]+).*$/$1/,DEFAULT"
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+      KAFKA_MIN_INSYNC_REPLICAS: "2"
+
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka-1:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-2:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-2
+    hostname: kafka-2
+    ports:
+      - "9093:9092"
+      - "19093:9093"
+    volumes:
+      - ./security/brokers/kafka-2:/etc/kafka/secrets:ro
+      - kafka2-data:/var/lib/kafka/data
+    environment:
+      CLUSTER_ID: abcdefghijklmnopqrstuv
+
+      KAFKA_NODE_ID: "2"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:9095,2@kafka-2:9095,3@kafka-3:9095"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093,SASL_SSL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-2:9092,SSL://kafka-2:9093,SASL_SSL://kafka-2:9094"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_SSL:SASL_SSL,CONTROLLER:PLAINTEXT"
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SSL"
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+
+      KAFKA_SSL_KEYSTORE_FILENAME: "keystore.p12"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "keystore_creds"
+      KAFKA_SSL_KEY_CREDENTIALS: "key_creds"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "truststore.p12"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "truststore_creds"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      KAFKA_LISTENER_NAME_SASL_SSL_SSL_CLIENT_AUTH: "none"
+      KAFKA_SASL_ENABLED_MECHANISMS: "SCRAM-SHA-256"
+      KAFKA_LISTENER_NAME_SASL_SSL_SASL_ENABLED_MECHANISMS: "SCRAM-SHA-256"
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf"
+
+      KAFKA_AUTHORIZER_CLASS_NAME: "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS;User:kafka-1;User:kafka-2;User:kafka-3"
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=([^,]+).*$/$1/,DEFAULT"
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+      KAFKA_MIN_INSYNC_REPLICAS: "2"
+
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka-2:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  kafka-3:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-3
+    hostname: kafka-3
+    ports:
+      - "9094:9092"
+      - "19094:9093"
+    volumes:
+      - ./security/brokers/kafka-3:/etc/kafka/secrets:ro
+      - kafka3-data:/var/lib/kafka/data
+    environment:
+      CLUSTER_ID: abcdefghijklmnopqrstuv
+
+      KAFKA_NODE_ID: "3"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:9095,2@kafka-2:9095,3@kafka-3:9095"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093,SASL_SSL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9095"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-3:9092,SSL://kafka-3:9093,SASL_SSL://kafka-3:9094"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_SSL:SASL_SSL,CONTROLLER:PLAINTEXT"
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SSL"
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+
+      KAFKA_SSL_KEYSTORE_FILENAME: "keystore.p12"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "keystore_creds"
+      KAFKA_SSL_KEY_CREDENTIALS: "key_creds"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "truststore.p12"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "truststore_creds"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      KAFKA_LISTENER_NAME_SASL_SSL_SSL_CLIENT_AUTH: "none"
+      KAFKA_SASL_ENABLED_MECHANISMS: "SCRAM-SHA-256"
+      KAFKA_LISTENER_NAME_SASL_SSL_SASL_ENABLED_MECHANISMS: "SCRAM-SHA-256"
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf"
+
+      KAFKA_AUTHORIZER_CLASS_NAME: "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS;User:kafka-1;User:kafka-2;User:kafka-3"
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=([^,]+).*$/$1/,DEFAULT"
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+      KAFKA_MIN_INSYNC_REPLICAS: "2"
+
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server kafka-3:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  kafka1-data:
+  kafka2-data:
+  kafka3-data:

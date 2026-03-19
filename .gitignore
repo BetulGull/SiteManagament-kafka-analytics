@@ -1,0 +1,52 @@
+
+# --- Firebase secrets ---
+**/serviceAccountKey.json
+**/*firebase-adminsdk*.json
+**/*serviceAccount*.json
+
+# --- Kafka TLS/SASL secrets ---
+security/**/keystore.p12
+security/**/truststore.p12
+security/**/keystore_creds
+security/**/truststore_creds
+security/**/key_creds
+security/**/server.key
+security/**/kafka_server_jaas.conf
+security/**/server.pem
+security/**/server.crt
+security/**/server.csr
+security/**/ca.crt
+
+# (istersen sadece CA crt kalsın istiyorsan yukarıdaki ca.crt satırını kaldırırsın)
+
+# --- Backup / temp files ---
+*.bak
+*.bak2
+*.bak3
+*.bak4
+*~
+
+# --- Local data folders ---
+db/
+analytics/
+.kafka/
+*.log
+
+# --- OS / IDE ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+
+# --- secrets / local credentials ---
+analytics-service/serviceAccountKey.json
+scripts/kafka_server_jaas.conf
+scripts/client-sasl*.properties
+
+# security materials (certs, keystores, creds)
+security/**
+!security/README.md

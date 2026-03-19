@@ -1,0 +1,75 @@
+services:
+  kafka-4:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-4
+    hostname: kafka-4
+
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+
+    ports:
+      - "9095:9092"
+      - "19095:9093"
+      - "29095:9094"
+
+    volumes:
+      - kafka4-data:/var/lib/kafka/data
+      - ./security/brokers/kafka-4:/etc/kafka/secrets:ro
+      - ./security/ca/ca.crt:/etc/kafka/secrets/ca.crt:ro
+
+    environment:
+      CLUSTER_ID: "abcdefghijklmnopqrstug"
+      KAFKA_CLUSTER_ID: "abcdefghijklmnopqrstug"
+      KAFKA_KRAFT_CLUSTER_ID: "abcdefghijklmnopqrstug"
+
+      KAFKA_NODE_ID: 4
+      KAFKA_PROCESS_ROLES: "broker"
+
+      # Broker-only: CONTROLLER listener burada OLMAYACAK
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,SSL://0.0.0.0:9093,SASL_SSL://0.0.0.0:9094"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-4:9092,SSL://kafka-4:9093,SASL_SSL://kafka-4:9094"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_SSL:SASL_SSL,CONTROLLER:PLAINTEXT"
+
+      # Broker, controller quorum'a bağlanacak (controller listener adı burada kalır ama listeners'ta yok!)
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-1:9095,2@kafka-2:9095,3@kafka-3:9095"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SSL"
+
+      KAFKA_SSL_KEYSTORE_FILENAME: "keystore.p12"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "truststore.p12"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "keystore_creds"
+      KAFKA_SSL_KEY_CREDENTIALS: "key_creds"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "truststore_creds"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      KAFKA_SSL_PRINCIPAL_MAPPING_RULES: "RULE:^CN=([^,]+).*$/$1/,DEFAULT"
+
+      KAFKA_SASL_ENABLED_MECHANISMS: "SCRAM-SHA-256"
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "SCRAM-SHA-256"
+
+      KAFKA_AUTHORIZER_CLASS_NAME: "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS;User:kafka-1;User:kafka-2;User:kafka-3;User:kafka-4"
+
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf"
+
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  kafka4-data:

@@ -1,0 +1,12 @@
+# scripts/kafka_server_jaas.conf.example
+KafkaServer {
+  org.apache.kafka.common.security.scram.ScramLoginModule required
+  username="admin"
+  password="CHANGE_ME";
+};
+
+Client {
+  org.apache.zookeeper.server.auth.DigestLoginModule required
+  username="ignored"
+  password="ignored";
+};

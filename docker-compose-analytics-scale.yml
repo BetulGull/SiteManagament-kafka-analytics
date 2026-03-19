@@ -1,0 +1,6 @@
+services:
+  analytics-service:
+    environment:
+      KAFKA_SECURITY_PROTOCOL: sasl_ssl
+      KAFKA_SASL_USERNAME: analytics
+      KAFKA_SASL_PASSWORD: analytics-secret

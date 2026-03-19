@@ -1,0 +1,50 @@
+services:
+  simulator-service:
+    build:
+      context: .
+      dockerfile: simulator-service/Dockerfile
+    environment:
+      TOPIC: events
+      INTERVAL_SEC: "1"
+      KAFKA_SECURITY_PROTOCOL: sasl_ssl
+      BOOTSTRAP_SERVERS: kafka-1:9094,kafka-2:9094,kafka-3:9094
+      KAFKA_SASL_MECHANISM: SCRAM-SHA-256
+      KAFKA_SASL_USERNAME: producer
+      KAFKA_SASL_PASSWORD: producer-secret
+      KAFKA_SSL_CA_LOCATION: /etc/kafka/secrets/ca.crt
+    volumes:
+      - ./security/ca/ca.crt:/etc/kafka/secrets/ca.crt:ro
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: analytics-service/Dockerfile
+    environment:
+      TOPIC: events
+      GROUP_ID: analytics-group
+      AUTO_OFFSET_RESET: earliest
+      WINDOW_SEC: "10"
+      KAFKA_SECURITY_PROTOCOL: sasl_ssl
+      BOOTSTRAP_SERVERS: kafka-1:9094,kafka-2:9094,kafka-3:9094
+      KAFKA_SASL_MECHANISM: SCRAM-SHA-256
+      KAFKA_SASL_USERNAME: analytics
+      KAFKA_SASL_PASSWORD: analytics-secret
+      KAFKA_SSL_CA_LOCATION: /etc/kafka/secrets/ca.crt
+      FIREBASE_KEY_PATH: /app/serviceAccountKey.json
+    volumes:
+      - ./security/ca/ca.crt:/etc/kafka/secrets/ca.crt:ro
+      - ./analytics-service/serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
