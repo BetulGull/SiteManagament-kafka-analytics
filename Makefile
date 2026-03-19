@@ -1,124 +1,166 @@
-SHELL := /bin/bash
-
-PROJECT := kafka-project
+# Makefile - SiteManagement Kafka Analytics
+# Usage examples:
+#   make up
+#   make logs
+#   make scale-analytics-2
+#   make attacker-up
+#   make down-v
 
 DC := docker compose
 
-BASE := -f docker-compose.yml
-KRAFT := -f docker-compose-kafka-kraft.yml
-SERV_SASL := -f docker-compose-services-sasl.yml
-AN_SCALE := -f docker-compose-analytics-scale.yml
-KAFKA4 := -f docker-compose-kafka4.yml
+# Kafka cluster (KRaft) - base stack
+BASE   := -f docker-compose.yml -f docker-compose-kafka-kraft.yml
 
-COMPOSE_CORE := $(BASE) $(KRAFT) $(SERV_SASL)
-COMPOSE_WITH_SCALE := $(BASE) $(KRAFT) $(SERV_SASL) $(AN_SCALE)
-COMPOSE_WITH_KAFKA4 := $(BASE) $(KRAFT) $(SERV_SASL) $(KAFKA4)
-COMPOSE_ALL := $(BASE) $(KRAFT) $(SERV_SASL) $(KAFKA4) $(AN_SCALE)
+# Microservices (SASL_SSL) - simulator + analytics
+SERV   := -f docker-compose-services-sasl.yml
 
-.PHONY: help ps logs kafka-up kafka-down services-up services-down up down stop start restart clean prune \
-        analytics-scale-1 analytics-scale-2 simulator-scale-1 simulator-scale-2 \
-        kafka4-up kafka4-down kafka4-ps topic-create acls-list
+# Optional: add 4th broker (kafka-4)
+K4     := -f docker-compose-kafka4.yml
+
+# Optional: analytics scaling overrides (your file that fixed env for scale)
+SCALEA := -f docker-compose-analytics-scale.yml
+
+# Security/attacker tests
+ATTACK := -f docker-compose-attacker.yml --profile attack
+
+.DEFAULT_GOAL := help
 
 help:
 	@echo ""
 	@echo "Targets:"
-	@echo "  make up                -> Start Kafka (kraft) + services (SASL_SSL)"
-	@echo "  make down              -> Stop & remove containers (keeps volumes)"
-	@echo "  make clean             -> Stop & remove containers + volumes (DATA RESET)"
-	@echo "  make ps                -> Show running containers"
-	@echo "  make logs              -> Tail logs (all)"
+	@echo "  make up                  -> Start Kafka (kafka-1..3) + services (simulator + analytics)"
+	@echo "  make up-k4               -> Start Kafka + services + kafka-4 (4th broker)"
+	@echo "  make down                -> Stop stack (keeps volumes)"
+	@echo "  make down-v              -> Stop stack and remove volumes"
+	@echo "  make ps                  -> Show running containers"
+	@echo "  make logs                -> Follow logs for all services"
+	@echo "  make logs-kafka          -> Follow logs for kafka brokers"
+	@echo "  make logs-analytics       -> Follow logs for analytics-service"
+	@echo "  make logs-simulator       -> Follow logs for simulator-service"
 	@echo ""
-	@echo "Kafka only:"
-	@echo "  make kafka-up           -> Start kafka-1..3"
-	@echo "  make kafka-down         -> Stop kafka-1..3 (keeps volumes)"
+	@echo "Scaling:"
+	@echo "  make scale-analytics-2    -> Run 2 analytics consumers (group rebalance will happen)"
+	@echo "  make scale-analytics-1    -> Back to 1 analytics consumer"
+	@echo "  make scale-simulator-2    -> Run 2 simulators (more load)"
+	@echo "  make scale-simulator-1    -> Back to 1 simulator"
 	@echo ""
-	@echo "Services only:"
-	@echo "  make services-up        -> Start analytics-service + simulator-service"
-	@echo "  make services-down      -> Stop services"
+	@echo "Security tests:"
+	@echo "  make attacker-up          -> Run attacker services (invalid cert / invalid CA)"
+	@echo "  make attacker-down        -> Stop attacker services"
+	@echo "  make auth-test-wrong      -> CLI test: wrong SASL credentials (should FAIL)"
 	@echo ""
-	@echo "Scaling (demo):"
-	@echo "  make analytics-scale-2  -> Run 2 analytics consumers (needs analytics-scale override)"
-	@echo "  make analytics-scale-1  -> Back to 1 analytics consumer"
-	@echo "  make simulator-scale-2  -> Run 2 simulators"
-	@echo "  make simulator-scale-1  -> Back to 1 simulator"
-	@echo ""
-	@echo "Kafka-4 (broker scaling demo):"
-	@echo "  make kafka4-up          -> Start kafka-4"
-	@echo "  make kafka4-down        -> Remove kafka-4"
-	@echo "  make kafka4-ps          -> Show kafka-4 status"
-	@echo ""
-	@echo "Common ops:"
-	@echo "  make topic-create       -> Create 'events' topic (idempotent-ish)"
-	@echo "  make acls-list          -> List ACLs (head)"
-	@echo "  make prune              -> docker system prune --volumes -f"
+	@echo "Kafka topic helpers:"
+	@echo "  make topic-create         -> Create 'events' topic (6 partitions, RF=3, minISR=2)"
+	@echo "  make topic-describe       -> Describe 'events' topic"
+	@echo "  make cg-describe          -> Describe consumer group 'analytics-group' (SASL_SSL admin config)"
 	@echo ""
 
-ps:
-	$(DC) $(COMPOSE_ALL) ps
-
-logs:
-	$(DC) $(COMPOSE_ALL) logs -f --tail=200
+# ------------------------------------------------------------
+# Stack lifecycle
+# ------------------------------------------------------------
 
 up:
-	$(DC) $(COMPOSE_CORE) up -d --build
+	$(DC) $(BASE) $(SERV) up -d --build
+
+up-k4:
+	$(DC) $(BASE) $(SERV) $(K4) up -d --build
 
 down:
-	$(DC) $(COMPOSE_CORE) down
+	$(DC) $(BASE) $(SERV) $(K4) $(SCALEA) down --remove-orphans || true
 
-stop:
-	$(DC) $(COMPOSE_ALL) stop
+down-v:
+	$(DC) $(BASE) $(SERV) $(K4) $(SCALEA) down --volumes --remove-orphans || true
 
-start:
-	$(DC) $(COMPOSE_ALL) start
+ps:
+	$(DC) $(BASE) $(SERV) $(K4) $(SCALEA) ps
 
-restart:
-	$(DC) $(COMPOSE_ALL) restart
+logs:
+	$(DC) $(BASE) $(SERV) $(K4) $(SCALEA) logs -f --tail=200
 
-clean:
-	$(DC) $(COMPOSE_ALL) down -v --remove-orphans
+logs-kafka:
+	$(DC) $(BASE) logs -f --tail=200 kafka-1 kafka-2 kafka-3 || true
 
-prune:
-	docker system prune --volumes -f
+logs-analytics:
+	$(DC) $(BASE) $(SERV) $(SCALEA) logs -f --tail=200 analytics-service || true
 
-kafka-up:
-	$(DC) $(BASE) $(KRAFT) up -d
+logs-simulator:
+	$(DC) $(BASE) $(SERV) logs -f --tail=200 simulator-service || true
 
-kafka-down:
-	$(DC) $(BASE) $(KRAFT) down
+restart-analytics:
+	$(DC) $(BASE) $(SERV) $(SCALEA) restart analytics-service
 
-services-up:
-	$(DC) $(BASE) $(KRAFT) $(SERV_SASL) up -d --build analytics-service simulator-service
+restart-simulator:
+	$(DC) $(BASE) $(SERV) restart simulator-service
 
-services-down:
-	$(DC) $(BASE) $(KRAFT) $(SERV_SASL) stop analytics-service simulator-service
+# ------------------------------------------------------------
+# Scaling (microservices)
+# Notes:
+# - analytics-service scaling uses docker-compose-analytics-scale.yml
+# - simulator scaling is possible as long as docker-compose-services-sasl.yml
+#   does NOT hardcode container_name for simulator-service.
+# ------------------------------------------------------------
 
-analytics-scale-2:
-	$(DC) $(COMPOSE_WITH_SCALE) up -d --no-recreate --scale analytics-service=2 analytics-service
+scale-analytics-2:
+	$(DC) $(BASE) $(SERV) $(SCALEA) up -d --no-recreate --scale analytics-service=2 analytics-service
 
-analytics-scale-1:
-	$(DC) $(COMPOSE_WITH_SCALE) up -d --no-recreate --scale analytics-service=1 analytics-service
+scale-analytics-1:
+	$(DC) $(BASE) $(SERV) $(SCALEA) up -d --no-recreate --scale analytics-service=1 analytics-service
 
-simulator-scale-2:
-	$(DC) $(COMPOSE_CORE) up -d --no-recreate --scale simulator-service=2 simulator-service
+scale-simulator-2:
+	$(DC) $(BASE) $(SERV) up -d --no-recreate --scale simulator-service=2 simulator-service
 
-simulator-scale-1:
-	$(DC) $(COMPOSE_CORE) up -d --no-recreate --scale simulator-service=1 simulator-service
+scale-simulator-1:
+	$(DC) $(BASE) $(SERV) up -d --no-recreate --scale simulator-service=1 simulator-service
 
-kafka4-up:
-	$(DC) $(COMPOSE_WITH_KAFKA4) up -d kafka-4
+# ------------------------------------------------------------
+# Attacker/Security tests (from docker-compose-attacker.yml)
+# Your attacker compose uses "profiles: [attack]" on services,
+# so we run with --profile attack.
+# ------------------------------------------------------------
 
-kafka4-down:
-	$(DC) $(COMPOSE_WITH_KAFKA4) rm -f -s kafka-4 || true
-	docker volume rm $(PROJECT)_kafka4-data 2>/dev/null || true
+attacker-up:
+	$(DC) $(BASE) $(ATTACK) up -d --build
 
-kafka4-ps:
-	$(DC) $(COMPOSE_WITH_KAFKA4) ps kafka-4
+attacker-down:
+	$(DC) $(BASE) $(ATTACK) down --remove-orphans || true
+
+# ------------------------------------------------------------
+# CLI negative test: wrong SASL credentials (should fail)
+# Runs from kafka-1 container and tries SASL_SSL admin request with wrong creds
+# ------------------------------------------------------------
+
+auth-test-wrong:
+	docker exec -it kafka-1 bash -lc '\
+cat > /tmp/client-sasl-wrong.properties <<EOF\n\
+security.protocol=SASL_SSL\n\
+sasl.mechanism=SCRAM-SHA-256\n\
+sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username="intruder" password="wrong";\n\
+ssl.endpoint.identification.algorithm=\n\
+ssl.truststore.location=/etc/kafka/secrets/truststore.p12\n\
+ssl.truststore.password=changeit\n\
+ssl.truststore.type=PKCS12\n\
+EOF\n\
+kafka-topics --bootstrap-server kafka-1:9094 --command-config /tmp/client-sasl-wrong.properties --list'
+
+# ------------------------------------------------------------
+# Topic / group helpers (PLAINTEXT admin on 9092)
+# ------------------------------------------------------------
 
 topic-create:
 	docker exec -it kafka-1 bash -lc '\
 kafka-topics --bootstrap-server kafka-1:9092 \
-  --create --topic events --partitions 6 --replication-factor 3 \
+  --create --topic events \
+  --partitions 6 \
+  --replication-factor 3 \
   --config min.insync.replicas=2 || true'
 
-acls-list:
-	docker exec -it kafka-1 bash -lc 'kafka-acls --bootstrap-server kafka-1:9092 --list 2>&1 | head -n 80 || true'
+topic-describe:
+	docker exec -it kafka-1 bash -lc '\
+kafka-topics --bootstrap-server kafka-1:9092 --describe --topic events | sed -n "1,80p"'
+
+cg-describe:
+	docker exec -it kafka-1 bash -lc '\
+kafka-consumer-groups --bootstrap-server kafka-1:9094 \
+  --command-config /tmp/client-sasl-admin.properties \
+  --describe --group analytics-group || true'
+
