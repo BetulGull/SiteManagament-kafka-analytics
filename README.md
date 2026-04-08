@@ -1,145 +1,83 @@
 
-# Site Management – Kafka Analytics 
+# Site Management – Kafka Analytics
 
-A small distributed system for **real-time event analytics** using **Apache Kafka** and **Firebase Firestore**.  
-It follows a classic **producer–consumer** microservices architecture: a simulator produces events to Kafka, and an analytics service consumes them and stores aggregated results in Firestore.
+A small distributed system for **real-time event analytics** using **Apache Kafka** and **Firebase Firestore**.
 
----
+It follows a simple **producer–consumer** architecture:
 
-## Project Overview
-
-This project simulates “site management / apartment” style events (e.g., announcements, maintenance, payments, security alerts), streams them through a **Kafka cluster**, and computes simple aggregates in near real time.
-
-**Main goals**
-- Event-driven architecture with Kafka
-- High availability via broker replication
-- Security via TLS + SASL (SCRAM)
-- Scalability via horizontal scaling (brokers + microservice replicas)
-- Persistence of analytics in Firestore
+- **Simulator service** produces site-management events to Kafka
+- **Analytics service** consumes them and writes aggregates to Firestore
 
 ---
 
-## Architecture
+## Components
 
-**Components**
-1. **Kafka Cluster (KRaft mode)**  
-   - Brokers: `kafka-1`, `kafka-2`, `kafka-3`  
-   - Optional: `kafka-4` to demonstrate scaling at broker level
-2. **Simulator Service (Producer)**  
-   - Generates mock events continuously and publishes them to Kafka (`events` topic)
-3. **Analytics Service (Consumer)**  
-   - Consumes events from Kafka
-   - Prints windowed stats to terminal
-   - Writes aggregates to **Firebase Firestore**
+- **Kafka Cluster (KRaft)**: `kafka-1`, `kafka-2`, `kafka-3`
+- **Optional broker**: `kafka-4` for broker-scaling demo
+- **Simulator Service**: producer
+- **Analytics Service**: consumer
+- **Kafka UI**: cluster inspection
 
 ---
 
-## Data & Firestore
+## Firestore Output
 
-The analytics service writes:
-- `agg_lifetime` (lifetime totals per site)
-- `agg_daily` (daily totals per site)
-- `agg_window` (window snapshots per site, e.g., every 10s)
+The analytics service writes the following collections:
 
-> Your Firebase Admin key file is **NOT committed**.  
-> You must provide your own Firestore project and service account key.
+- `agg_lifetime`
+- `agg_daily`
+- `agg_window`
 
 ---
 
-## Prerequisites
+## Firebase Setup
 
-- Docker + Docker Compose
-- GNU Make (or compatible `make`)
-- A Firebase project with Firestore enabled
-- Firebase Admin service account key JSON
-
----
-
-## Setup
-
-### 1) Place the Firebase key
-
-Put your key here:
+You must provide your own Firebase Admin key:
 
 ```bash
 analytics-service/serviceAccountKey.json
 ````
 
-This file is ignored by git (`.gitignore`) and is mounted read-only into the analytics container.
+---
 
-### 2) Start the stack
+## Prerequisites
 
-Build & start Kafka (3 brokers) + services:
+Before running the project, make sure you have:
 
-```bash
-make up
-```
-
-If you also want to start `kafka-4` (broker scaling demo):
-
-```bash
-make up-k4
-```
+* **Docker**
+* **Docker Compose**
+* **GNU Make**
+* A **Firebase project** with **Firestore enabled**
+* A **Firebase Admin service account key** in JSON format
 
 ---
 
-## Kafka Topic
+## Startup
 
-Create the `events` topic (recommended defaults used in the project):
-
-```bash
-make topic-create
-```
-
-Check topic status:
+Start the full environment:
 
 ```bash
-make topic-describe
+make compose-up
 ```
 
----
-
-## Useful Commands
-
-### View containers
+Show running containers:
 
 ```bash
 make ps
 ```
 
-### Follow logs
-
-All logs:
-
-```bash
-make logs
-```
-
-Kafka only:
-
-```bash
-make logs-kafka
-```
-
-Analytics only:
-
-```bash
-make logs-analytics
-```
-
-Simulator only:
+View service logs:
 
 ```bash
 make logs-simulator
+make logs-analytics
 ```
 
 ---
 
-## Scalability Demo
+## Scalability
 
-### A) Microservice scaling (consumer replication)
-
-Scale analytics consumers to 2 instances (Kafka group rebalance will happen):
+Scale analytics consumers to 2:
 
 ```bash
 make scale-analytics-2
@@ -151,97 +89,140 @@ Scale back to 1:
 make scale-analytics-1
 ```
 
-How to “see” the scaling:
+Using Kafka UI, you can observe:
 
-* `make ps` will show 2 analytics containers when scaled up
-* Kafka group assignment can be checked with:
+* consumer group members
+* partition reassignment
+* rebalance behavior
+
+---
+
+## Security
+
+### Admin success case
 
 ```bash
-make cg-describe
+make security-admin
 ```
 
-You should see partitions split between two consumer IDs when `scale=2`.
-
-### B) Producer scaling (simulator replication)
-
-Scale simulator to 2 producers (more load / higher event rate):
+### Wrong credentials
 
 ```bash
-make scale-simulator-2
+make security-wrong
 ```
 
-Scale back:
+### Intruder / authorization failure
 
 ```bash
-make scale-simulator-1
+make security-intruder
 ```
 
 ---
 
-## Security (TLS + SASL + ACL)
+## SSL Certificate Demo Commands
 
-Kafka is configured with:
-
-* TLS encryption for broker–client traffic
-* SASL/SCRAM-SHA-256 authentication for services
-* ACL-based authorization (deny by default)
-
-### Quick negative auth test (wrong credentials)
-
-This should fail with `SaslAuthenticationException`:
+### Producer with valid certificate
 
 ```bash
-make auth-test-wrong
+make attacker-producer-valid-cert-demo
+```
+
+### Producer with invalid certificate
+
+```bash
+make attacker-producer-invalid-cert-demo
+```
+
+### Consumer with valid certificate
+
+```bash
+make attacker-consumer-valid-cert-demo
+```
+
+### Consumer with invalid certificate
+
+```bash
+make attacker-consumer-invalid-cert-demo
 ```
 
 ---
 
-## Security “Attacker” Tests (Optional)
+## SASL/SCRAM Credential Demo Commands
 
-The repo includes attacker services to demonstrate security failures (e.g., invalid certificate / invalid CA).
-Start them with:
+### Producer with valid credentials
 
 ```bash
-make attacker-up
+make attacker-producer-valid-creds-demo
 ```
 
-Stop them with:
+### Producer with wrong credentials
+
+```bash
+make attacker-producer-wrong-creds-demo
+```
+
+### Consumer with valid credentials
+
+```bash
+make attacker-consumer-valid-creds-demo
+```
+
+### Consumer with wrong credentials
+
+```bash
+make attacker-consumer-wrong-creds-demo
+```
+
+---
+
+## Broker-4 / Inter-Broker Permission Demo
+
+Start broker-4:
+
+```bash
+make broker4-up
+make broker4-check
+```
+
+After updating `KAFKA_SUPER_USERS` to include `User:kafka-4`, run:
+
+```bash
+make broker4-fix-kafka1
+make broker4-fix-kafka3
+make broker4-fix-kafka4
+make broker4-fix
+make broker4-verify
+make broker4-topic
+make broker4-check
+```
+
+---
+
+## Cleanup
+
+Stop attacker/demo containers:
 
 ```bash
 make attacker-down
 ```
 
-You can observe expected failures via:
+Re-copy security property files if needed:
 
 ```bash
-docker compose -f docker-compose-attacker.yml logs -f --tail=200
+make props-copy
 ```
-
----
-
-## Stopping the System (to avoid Firestore filling up)
-
-Stop everything (keep volumes/data):
-
-```bash
-make down
-```
-
-Stop everything and remove volumes (full reset):
-
-```bash
-make down-v
-```
-
-> Tip: For demos, always stop the simulator and analytics when done to avoid accumulating Firestore writes.
 
 ---
 
 ## Tech Stack
 
-* **Apache Kafka (KRaft)** – event streaming / message broker
-* **Python** – microservices implementation
-* **Firebase Firestore** – persistent analytics storage
-* **Docker Compose** – local orchestration
+* **Apache Kafka (KRaft)**
+* **Python**
+* **Firebase Firestore**
+* **Docker Compose**
+* **Kafka UI**
 
+```
 
+İstersen bunu daha profesyonel ve kısa bir GitHub README formatına da çevirebilirim.
+```
