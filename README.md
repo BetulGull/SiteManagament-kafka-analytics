@@ -184,6 +184,24 @@ make broker4-up
 make broker4-check
 ```
 
+Update `KAFKA_SUPER_USERS` to include `User:kafka-4`,
+
+```bash
+nano docker-compose-kafka-kraft.yml
+KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS;User:kafka-1;User:kafka-2;User:kafka-3;User:kafka-4”
+```
+control
+
+```bash
+grep -n "KAFKA_SUPER_USERS" docker-compose-kafka-kraft.yml
+```
+output:
+
+```bash
+41:      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS;User:kafka-1;User:kafka-2;User:kafka-3;User:kafka-4"
+95:      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS;User:kafka-1;User:kafka-2;User:kafka-3;User:kafka-4"
+149:      KAFKA_SUPER_USERS: "User:admin;User:ANONYMOUS;User:kafka-1;User:kafka-2;User:kafka-3;User:kafka-4"
+```
 After updating `KAFKA_SUPER_USERS` to include `User:kafka-4`, run:
 
 ```bash
