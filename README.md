@@ -181,7 +181,7 @@ Start broker-4:
 
 ```bash
 make broker4-up
-make broker4-check
+make broker4-demo-topic-run
 ```
 
 Update `KAFKA_SUPER_USERS` to include `User:kafka-4`,
